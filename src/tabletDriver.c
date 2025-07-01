@@ -102,10 +102,20 @@ void open_input_channel(const char *pen_device_path) {
 
 // Helper: Read a single input_event from the persistent SSH channel
 void read_remote_input_event(struct input_event *ie) {
+    /* 
+     * Given format:
+     * Time, millis, type, code, value
+     * unsigned int, unsigned int, unsigned short, unsigned short, int
+     * 4, 4, 2, 2, 4
+     * Total is 16 bytes
+     */
     size_t total = 0;
-    char *ptr = (char *)ie;
-    while (total < sizeof(struct input_event)) {
-        int n = ssh_channel_read(input_channel, ptr + total, sizeof(struct input_event) - total, 0);
+    const size_t input_size = 16;
+    char buffer[input_size] = {};
+    char *ptr = buffer;
+
+    while (total < input_size) {
+        int n = ssh_channel_read(input_channel, ptr + total, input_size - total, 0);
         if (n < 0) {
             fprintf(stderr, "Failed to read input_event from SSH channel (error)\n");
             ssh_channel_close(input_channel);
@@ -113,16 +123,26 @@ void read_remote_input_event(struct input_event *ie) {
             exit(1);
         }
         if (n == 0) {
-            if (total < sizeof(struct input_event)) {
-                fprintf(stderr, "EOF before reading full input_event (%zu/%zu bytes)\n", total, sizeof(struct input_event));
-                ssh_channel_close(input_channel);
-                ssh_channel_free(input_channel);
-                exit(1);
-            }
-            break;
+            fprintf(stderr, "EOF before reading full input_event (%zu/%zu bytes)\n", total, input_size);
+            ssh_channel_close(input_channel);
+            ssh_channel_free(input_channel);
+            exit(1);
         }
         total += n;
     }
+
+    // Unpack the struct from the buffer
+    size_t offset = 0;
+    // Skip time
+    //memcpy(&ie->time.tv_sec, buffer + offset, 4);
+    offset += 4;
+    //memcpy(&ie->time.tv_usec, buffer + offset, 4);
+    offset += 4;
+    memcpy(&ie->type, buffer + offset, 2);
+    offset += 2;
+    memcpy(&ie->code, buffer + offset, 2);
+    offset += 2;
+    memcpy(&ie->value, buffer + offset, 4);
 }
 
 /* Gets the input event from the tablet using SSH */
@@ -139,6 +159,7 @@ struct input_event get_input_event() {
         channel_opened = 1;
     }
     read_remote_input_event(&ie);
+    print_verbose("Input Event. Type: %d, Code: %d, Value: %d\n", ie.type, ie.code, ie.value);
     return ie;
 }
 
