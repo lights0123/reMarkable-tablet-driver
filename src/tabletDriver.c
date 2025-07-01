@@ -2,13 +2,23 @@
 #include <fcntl.h>
 #include <linux/uinput.h>
 
+#include <stdbool.h>
+
 #include "argument_parser.h"
 #include "ssh.h"
 
 /* Global variables */
 int fd;
+bool verbose;
 ssh_session session;
 static ssh_channel input_channel = NULL;
+
+/* This function only prints if verbose is enabled */
+static inline void print_verbose(const char *format, ...) {
+    if (verbose) {
+        printf(format);
+    }
+}
 
 void emit(int fd, int type, int code, int val)
 {
@@ -80,7 +90,7 @@ void open_input_channel(const char *pen_device_path) {
     }
     char cmd[256];
     snprintf(cmd, sizeof(cmd), "cat %s", pen_device_path);
-    printf("Opening persistent input channel: %s\n", cmd);
+    print_verbose("Opening persistent input channel: %s\n", cmd);
     rc = ssh_channel_request_exec(input_channel, cmd);
     if (rc != SSH_OK) {
         fprintf(stderr, "Failed to exec remote cat command\n");
@@ -177,6 +187,7 @@ int main(int argc, char** argv) {
   argp_parse (&argp, argc, argv, 0, 0, &arguments);
 
   if (arguments.verbose) {
+    verbose = true;
     print_arguments(&arguments);
   }
 
