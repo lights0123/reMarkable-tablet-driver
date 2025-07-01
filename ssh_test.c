@@ -186,6 +186,39 @@ int print_command_output(ssh_session session, const char* cmd) {
   ssh_channel_free(channel);
 }
 
+int create_ssh_session(ssh_session *session, const char *address, const int *port) {
+  *session = ssh_new();
+  if (*session == NULL) {
+    fprintf(stderr, "Couldn't create SSH session.\n");
+    return(SSH_ERROR);
+  }
+
+  /* SSH Connection Config */
+  ssh_options_set(*session, SSH_OPTIONS_HOST, address);
+  ssh_options_set(*session, SSH_OPTIONS_PORT, port);
+
+  /* Try to establish connection */
+  if (ssh_connect(*session) != SSH_OK) {
+    fprintf(stderr, "Error connecting to host: %s\n", ssh_get_error(*session));
+    ssh_free(*session);
+    return(SSH_ERROR);
+  }
+
+  /* Verify server's identity */
+  if (verify_knownhost(*session) < 0) {
+    ssh_disconnect(*session);
+    ssh_free(*session);
+    return(SSH_ERROR);
+  }
+
+  /* Authenticate ourselves */
+  if (authenticate_with_password(*session) < 0) {
+    ssh_disconnect(*session);
+    ssh_free(*session);
+    return(SSH_ERROR);
+  }
+}
+
 int main(int argc, char *argv[])
 {
   /*
@@ -197,6 +230,7 @@ int main(int argc, char *argv[])
   arguments.verbose = 0;
   arguments.private_key_file = "";
   arguments.address = "10.11.99.1";
+  arguments.port = 22;
   arguments.orientation = "right";
   arguments.threshold = 600;
 
@@ -211,36 +245,8 @@ int main(int argc, char *argv[])
   /*
    * SSH Connection bit
    */
-  ssh_session session = ssh_new();
-  if (session == NULL) {
-    fprintf(stderr, "Couldn't create SSH session.\n");
-    return(SSH_ERROR);
-  }
-
-  /* SSH Connection Config */
-  ssh_options_set(session, SSH_OPTIONS_HOST, arguments.address);
-  ssh_options_set(session, SSH_OPTIONS_PORT, &arguments.port); /* TODO: Add CLI argument for this */
-
-  /* Try to establish connection */
-  if (ssh_connect(session) != SSH_OK) {
-    fprintf(stderr, "Error connecting to host: %s\n", ssh_get_error(session));
-    ssh_free(session);
-    return(SSH_ERROR);
-  }
-
-  /* Verify server's identity */
-  if (verify_knownhost(session) < 0) {
-    ssh_disconnect(session);
-    ssh_free(session);
-    return(SSH_ERROR);
-  }
-
-  /* Authenticate ourselves */
-  if (authenticate_with_password(session) < 0) {
-    ssh_disconnect(session);
-    ssh_free(session);
-    return(SSH_ERROR);
-  }
+  ssh_session session;
+  create_ssh_session(&session, arguments.address, &arguments.port);
 
   /* Run ls command on tablet */
   print_command_output(session, "ls");
