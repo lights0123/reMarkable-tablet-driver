@@ -209,10 +209,9 @@ int main(int argc, char **argv) {
 
   struct uinput_setup usetup;
   memset(&usetup, 0, sizeof(usetup));
-  usetup.id.bustype = BUS_VIRTUAL;
-  // usetup.id.vendor = 0x1235; /* sample vendor */
-  // usetup.id.product = 0x7890; /* sample product */
-  usetup.id.version = 0x3;
+  usetup.id.bustype = BUS_USB;
+  usetup.id.version = 0x3;      // USB
+  usetup.id.vendor = 0x056a;    // Wacom
   strcpy(
       usetup.name,
       "reMarkableTablet-FakePen");  // Has to end with "pen" to work in Krita!!!
