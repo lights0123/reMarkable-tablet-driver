@@ -37,6 +37,11 @@ static error_t parse_opt (int key, char *arg, struct argp_state *state) {
       arguments->verbose = 1;
       break;
     case 'k':
+      /* 192.168.xxx.xxx = 15 characters */
+      if (strlen(arg > 15)) {
+        fprintf("Address is too long or doesn't match the format required.");
+        return ARGP_ERR_UNKNOWN;
+      }
       arguments->private_key_file = arg;
       break;
     case 'a':
