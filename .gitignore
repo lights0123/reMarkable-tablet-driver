@@ -1,7 +1,2 @@
-# Python:
-__pycache__/
-*.py[cod]
-*$py.class
-
 # Built stuff:
 tabletDriver

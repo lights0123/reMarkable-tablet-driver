@@ -1,8 +1,7 @@
-rebuild:
-	make clean build
+all: build
 
 clean:
 	rm -f tabletDriver
 
 build:
-	gcc tabletDriver.c -o tabletDriver
+	cc src/tabletDriver.c -o tabletDriver
