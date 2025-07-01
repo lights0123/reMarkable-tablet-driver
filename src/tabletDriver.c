@@ -1,29 +1,14 @@
-/*
- * Does the same as tableDriver.py !
- * Requires linux 4.5 rc1 or higher.
- */
-
 // Custom device:
 #include <fcntl.h>
 #include <linux/uinput.h>
-#include <stdint.h>
 
-// Client connection:
-#include <string.h>
-#include <errno.h>
-#include <netdb.h>
-#include <netinet/in.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <unistd.h>
+#include "argument_parser.h"
+#include "ssh.h"
 
-struct input_packet {
-	uint16_t type;
-	uint16_t code;
-	int32_t value;
-};
+/* Global variables */
+int fd;
+ssh_session session;
+static ssh_channel input_channel = NULL;
 
 void emit(int fd, int type, int code, int val)
 {
@@ -37,6 +22,114 @@ void emit(int fd, int type, int code, int val)
    ie.time.tv_usec = 0;
 
    write(fd, &ie, sizeof(ie));
+}
+
+/* Passes given input event (received from tablet) to the virtual tablet */
+void pass_input_event(struct input_event ie) {
+   write(fd, &ie, sizeof(ie));
+}
+
+// Helper: Get the pen device path from the remote tablet
+void get_pen_device_path(char *pen_device_path, size_t path_len) {
+    ssh_channel channel = ssh_channel_new(session);
+    if (channel == NULL) {
+        fprintf(stderr, "Failed to create SSH channel\n");
+        exit(1);
+    }
+    int rc = ssh_channel_open_session(channel);
+    if (rc != SSH_OK) {
+        fprintf(stderr, "Failed to open SSH channel session\n");
+        ssh_channel_free(channel);
+        exit(1);
+    }
+    rc = ssh_channel_request_exec(channel, "readlink -f /dev/input/touchscreen0");
+    if (rc != SSH_OK) {
+        fprintf(stderr, "Failed to exec readlink command\n");
+        ssh_channel_close(channel);
+        ssh_channel_free(channel);
+        exit(1);
+    }
+    int len = ssh_channel_read(channel, pen_device_path, path_len - 1, 0);
+    if (len <= 0) {
+        fprintf(stderr, "Failed to read pen device path from SSH channel\n");
+        ssh_channel_close(channel);
+        ssh_channel_free(channel);
+        exit(1);
+    }
+    pen_device_path[len] = '\0';
+    // Remove trailing newline if present
+    char *newline = strchr(pen_device_path, '\n');
+    if (newline) *newline = '\0';
+    ssh_channel_send_eof(channel);
+    ssh_channel_close(channel);
+    ssh_channel_free(channel);
+}
+
+// Helper: Open a persistent SSH channel and start cat on the device
+void open_input_channel(const char *pen_device_path) {
+    input_channel = ssh_channel_new(session);
+    if (input_channel == NULL) {
+        fprintf(stderr, "Failed to create SSH channel\n");
+        exit(1);
+    }
+    int rc = ssh_channel_open_session(input_channel);
+    if (rc != SSH_OK) {
+        fprintf(stderr, "Failed to open SSH channel session\n");
+        ssh_channel_free(input_channel);
+        exit(1);
+    }
+    char cmd[256];
+    snprintf(cmd, sizeof(cmd), "cat %s", pen_device_path);
+    printf("Opening persistent input channel: %s\n", cmd);
+    rc = ssh_channel_request_exec(input_channel, cmd);
+    if (rc != SSH_OK) {
+        fprintf(stderr, "Failed to exec remote cat command\n");
+        ssh_channel_close(input_channel);
+        ssh_channel_free(input_channel);
+        exit(1);
+    }
+}
+
+// Helper: Read a single input_event from the persistent SSH channel
+void read_remote_input_event(struct input_event *ie) {
+    size_t total = 0;
+    char *ptr = (char *)ie;
+    while (total < sizeof(struct input_event)) {
+        int n = ssh_channel_read(input_channel, ptr + total, sizeof(struct input_event) - total, 0);
+        if (n < 0) {
+            fprintf(stderr, "Failed to read input_event from SSH channel (error)\n");
+            ssh_channel_close(input_channel);
+            ssh_channel_free(input_channel);
+            exit(1);
+        }
+        if (n == 0) {
+            if (total < sizeof(struct input_event)) {
+                fprintf(stderr, "EOF before reading full input_event (%zu/%zu bytes)\n", total, sizeof(struct input_event));
+                ssh_channel_close(input_channel);
+                ssh_channel_free(input_channel);
+                exit(1);
+            }
+            break;
+        }
+        total += n;
+    }
+}
+
+/* Gets the input event from the tablet using SSH */
+struct input_event get_input_event() {
+    static char pen_device_path[128] = "";
+    static int channel_opened = 0;
+    struct input_event ie;
+    // Only detect the pen device path and open channel once
+    if (pen_device_path[0] == '\0') {
+        get_pen_device_path(pen_device_path, sizeof(pen_device_path));
+    }
+    if (!channel_opened) {
+        open_input_channel(pen_device_path);
+        channel_opened = 1;
+    }
+    read_remote_input_event(&ie);
+    return ie;
 }
 
 
@@ -61,24 +154,34 @@ void addAbsCapability(int fd, int code, int32_t value, int32_t min, int32_t max,
    }
 }
 
-int main(int argc, char** argv)
-{
-   // IP of reMarkable changeable as parameter:
-   char hostname[30];
-   strcpy(hostname, "10.11.99.1"); // Default IP
-
-   if(argc > 1) {
-      if(strlen(argv[1]) > 29) {
-         fprintf(stderr, "The IP/Hostname is too long!");
-         return 1;
-      }
-
-      strcpy(hostname, argv[1]);
+   void closeDevice() {
+      ioctl(fd, UI_DEV_DESTROY);
+      close(fd);
    }
 
+int main(int argc, char** argv) {
+  /*
+   * Setup argument parsing
+   */
+  struct arguments arguments;
+  /* Default values. */
+  arguments.verbose = 0;
+  arguments.private_key_file = "";
+  arguments.address = "10.11.99.1";
+  arguments.port = 22;
+  arguments.orientation = "right";
+  arguments.threshold = 600;
+
+  /* Parse our arguments; every option seen by parse_opt will
+     be reflected in arguments. */
+  argp_parse (&argp, argc, argv, 0, 0, &arguments);
+
+  if (arguments.verbose) {
+    print_arguments(&arguments);
+  }
 
    // Create virtual tablet:
-   int fd = open("/dev/uinput", O_WRONLY | O_NONBLOCK);
+   fd = open("/dev/uinput", O_WRONLY | O_NONBLOCK);
 
    ioctl(fd, UI_SET_EVBIT, EV_KEY);
    ioctl(fd, UI_SET_KEYBIT, BTN_TOOL_PEN); // BTN_TOOL_PEN == 1 means that the pen is hovering over the tablet
@@ -113,53 +216,31 @@ int main(int argc, char** argv)
       return 1;
    }
 
-   void closeDevice() {
-      ioctl(fd, UI_DEV_DESTROY);
-      close(fd);
-   }
-
-
-   // Connect to reMarkable:
-   int clientFd = socket(AF_INET, SOCK_STREAM, 0);   
-   
-   struct hostent *host = gethostbyname(hostname);
-
-   struct sockaddr_in address;
-   memset(&address, 0, sizeof(address));
-
-   address.sin_family = AF_INET;
-   bcopy((char *)host->h_addr, (char *)&address.sin_addr.s_addr, host->h_length);
-   address.sin_port = htons(33333);
-   
-   if(connect(clientFd, (struct sockaddr*) &address, sizeof(address)) < 0) {
-      perror("Failed to connect to the reMarkable");
-      closeDevice();
-      return 1;
-   }
-
+   /* Connect to reMarkable */
+  create_ssh_session(&session, arguments.address, &arguments.port);
    printf("Connected\n");
 
-   struct input_packet packet;
-   size_t offset = 0;
-
    while(1) {
-      ssize_t ret = read(clientFd, ((void*) &packet) + offset, sizeof(packet) - offset);
-      if(ret < 0) {
-         perror("Connection failed");
-         closeDevice();
-         return 1;
-      }
-      offset += ret;
-      if(offset < sizeof(packet))
-        continue;
-      offset = 0;
-
-      emit(fd, packet.type, packet.code, packet.value);
+      /* Get packet and pass it to emit() function */
+      //emit(fd, packet.type, packet.code, packet.value);
+      struct input_event ie = get_input_event();
+      pass_input_event(ie);
    }
-
 
    // Close virtual tablet:
    closeDevice();
+
+   /* Cleanup SSH input channel */
+   if (input_channel) {
+      ssh_channel_send_eof(input_channel);
+      ssh_channel_close(input_channel);
+      ssh_channel_free(input_channel);
+      input_channel = NULL;
+   }
+
+   /* Cleanup ssh connection */
+   ssh_disconnect(session);
+   ssh_free(session);
 
    return 0;
 }

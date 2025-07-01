@@ -222,10 +222,9 @@ int create_ssh_session(ssh_session *session, const char *address, const int *por
 int main(int argc, char *argv[])
 {
   /*
-   * Argument parsing bit
+   * Setup argument parsing
    */
   struct arguments arguments;
-
   /* Default values. */
   arguments.verbose = 0;
   arguments.private_key_file = "";
