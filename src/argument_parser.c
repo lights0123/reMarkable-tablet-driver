@@ -1,9 +1,9 @@
 #include "argument_parser.h"
 
 const char *argp_program_bug_address =
-  "https://github.com/FreeCap23/reMarkable-tablet-driver/issues";
+    "https://github.com/FreeCap23/reMarkable-tablet-driver/issues";
 
-error_t parse_opt (int key, char *arg, struct argp_state *state) {
+error_t parse_opt(int key, char *arg, struct argp_state *state) {
   /* Get the input argument from argp_parse, which we
      know is a pointer to our arguments structure. */
   struct arguments *arguments = state->input;
@@ -15,7 +15,10 @@ error_t parse_opt (int key, char *arg, struct argp_state *state) {
     case 'k':
       /* 192.168.xxx.xxx = 15 characters */
       if (strlen(arg) > 15) {
-        fprintf(stderr, "Address %s is too long or doesn't match the format required.\n", arg);
+        fprintf(
+            stderr,
+            "Address %s is too long or doesn't match the format required.\n",
+            arg);
         return ARGP_ERR_UNKNOWN;
       }
       arguments->private_key_file = arg;
@@ -27,14 +30,14 @@ error_t parse_opt (int key, char *arg, struct argp_state *state) {
       arguments->port = atoi(arg);
       break;
     case 'o':
-      if (
-        strcmp(arg, "top") == 0 ||
-        strcmp(arg, "buttom") == 0 ||
-        strcmp(arg, "right") == 0 ||
-        strcmp(arg, "left") == 0) {
-          arguments->orientation = arg;
+      if (strcmp(arg, "top") == 0 || strcmp(arg, "buttom") == 0 ||
+          strcmp(arg, "right") == 0 || strcmp(arg, "left") == 0) {
+        arguments->orientation = arg;
       } else {
-        fprintf(stderr, "Wrong argument key %s. Is it one of top, left, right, bottom?\n", arg);
+        fprintf(stderr,
+                "Wrong argument key %s. Is it one of top, left, right, "
+                "bottom?\n",
+                arg);
         return ARGP_ERR_UNKNOWN;
       }
       break;
@@ -44,22 +47,18 @@ error_t parse_opt (int key, char *arg, struct argp_state *state) {
 
     default:
       return ARGP_ERR_UNKNOWN;
-    }
+  }
   return 0;
 }
 
 void print_arguments(struct arguments *args) {
-  printf("verbose = %s\n"
-          "private key file = %s\n"
-          "address = %s\n"
-          "port = %d\n"
-          "orientation = %s\n"
-          "threshold = %d\n\n",
-          args->verbose ? "yes" : "no",
-          args->private_key_file,
-          args->address,
-          args->port,
-          args->orientation,
-          args->threshold
-        );
+  printf(
+      "verbose = %s\n"
+      "private key file = %s\n"
+      "address = %s\n"
+      "port = %d\n"
+      "orientation = %s\n"
+      "threshold = %d\n\n",
+      args->verbose ? "yes" : "no", args->private_key_file, args->address,
+      args->port, args->orientation, args->threshold);
 }

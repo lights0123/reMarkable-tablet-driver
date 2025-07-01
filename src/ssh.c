@@ -16,10 +16,8 @@ int verify_knownhost(ssh_session session) {
     return -1;
   }
 
-  rc = ssh_get_publickey_hash(srv_pubkey,
-                              SSH_PUBLICKEY_HASH_SHA1,
-                              &hash,
-                              &hlen);
+  rc =
+      ssh_get_publickey_hash(srv_pubkey, SSH_PUBLICKEY_HASH_SHA1, &hash, &hlen);
   ssh_key_free(srv_pubkey);
   if (rc < 0) {
     return -1;
@@ -32,31 +30,33 @@ int verify_knownhost(ssh_session session) {
       break;
     case SSH_KNOWN_HOSTS_CHANGED:
       fprintf(stderr,
-        "Host key for server changed. it is now: %s\n"
-        "For security reasons, connection will be stopped\n",
-        hash
-      );
+              "Host key for server changed. it is now: %s\n"
+              "For security reasons, connection will be stopped\n",
+              hash);
       ssh_clean_pubkey_hash(&hash);
 
       return -1;
     case SSH_KNOWN_HOSTS_OTHER:
-      fprintf(stderr, "The host key for this server was not found but an other"
+      fprintf(stderr,
+              "The host key for this server was not found but an other"
               "type of key exists.\n");
-      fprintf(stderr, "An attacker might change the default server key to"
+      fprintf(stderr,
+              "An attacker might change the default server key to"
               "confuse your client into thinking the key does not exist\n");
       ssh_clean_pubkey_hash(&hash);
 
       return -1;
     case SSH_KNOWN_HOSTS_NOT_FOUND:
       fprintf(stderr, "Could not find known host file.\n");
-      fprintf(stderr, "If you accept the host key here, the file will be"
+      fprintf(stderr,
+              "If you accept the host key here, the file will be"
               "automatically created.\n");
 
       /* FALL THROUGH to SSH_SERVER_NOT_KNOWN behavior */
 
     case SSH_KNOWN_HOSTS_UNKNOWN:
       hexa = ssh_get_hexa(hash, hlen);
-      fprintf(stderr,"The server is unknown. Do you trust the host key?\n");
+      fprintf(stderr, "The server is unknown. Do you trust the host key?\n");
       fprintf(stderr, "Public key hash: %s\n", hexa);
       ssh_string_free_char(hexa);
       ssh_clean_pubkey_hash(&hash);
@@ -90,8 +90,7 @@ int verify_knownhost(ssh_session session) {
 int authenticate_pubkey(ssh_session session) {
   int rc = ssh_userauth_publickey_auto(session, NULL, NULL);
   if (rc == SSH_AUTH_ERROR) {
-    fprintf(stderr, "Authentication failed: %s\n",
-      ssh_get_error(session));
+    fprintf(stderr, "Authentication failed: %s\n", ssh_get_error(session));
     return SSH_AUTH_ERROR;
   }
   return rc;
@@ -100,8 +99,7 @@ int authenticate_pubkey(ssh_session session) {
 int authenticate_privkey(ssh_session session, ssh_key privkey) {
   int rc = ssh_userauth_publickey(session, NULL, privkey);
   if (rc == SSH_AUTH_ERROR) {
-    fprintf(stderr, "Authentication failed: %s\n",
-      ssh_get_error(session));
+    fprintf(stderr, "Authentication failed: %s\n", ssh_get_error(session));
     return SSH_AUTH_ERROR;
   }
   return rc;
@@ -118,12 +116,13 @@ int authenticate_with_password(ssh_session session) {
 
   rc = ssh_userauth_password(session, "root", password);
   if (rc != SSH_AUTH_SUCCESS) {
-    fprintf(stderr, "Error authenticating with password: %s\n", ssh_get_error(session));
+    fprintf(stderr, "Error authenticating with password: %s\n",
+            ssh_get_error(session));
   }
   return rc;
 }
 
-int print_command_output(ssh_session session, const char* cmd) {
+int print_command_output(ssh_session session, const char *cmd) {
   ssh_channel channel;
   const int buffer_size = 256;
   char buffer[buffer_size];
@@ -150,7 +149,7 @@ int print_command_output(ssh_session session, const char* cmd) {
 
   nbytes = ssh_channel_read(channel, buffer, buffer_size, 0);
   while (nbytes > 0) {
-    if (write(1, buffer, nbytes) != (unsigned int) nbytes) {
+    if (write(1, buffer, nbytes) != (unsigned int)nbytes) {
       ssh_channel_close(channel);
       ssh_channel_free(channel);
     }
@@ -169,11 +168,12 @@ int print_command_output(ssh_session session, const char* cmd) {
   ssh_channel_free(channel);
 }
 
-int create_ssh_session(ssh_session *session, const char *address, const int *port) {
+int create_ssh_session(ssh_session *session, const char *address,
+                       const int *port) {
   *session = ssh_new();
   if (*session == NULL) {
     fprintf(stderr, "Couldn't create SSH session.\n");
-    return(SSH_ERROR);
+    return (SSH_ERROR);
   }
 
   /* SSH Connection Config */
@@ -184,20 +184,20 @@ int create_ssh_session(ssh_session *session, const char *address, const int *por
   if (ssh_connect(*session) != SSH_OK) {
     fprintf(stderr, "Error connecting to host: %s\n", ssh_get_error(*session));
     ssh_free(*session);
-    return(SSH_ERROR);
+    return (SSH_ERROR);
   }
 
   /* Verify server's identity */
   if (verify_knownhost(*session) < 0) {
     ssh_disconnect(*session);
     ssh_free(*session);
-    return(SSH_ERROR);
+    return (SSH_ERROR);
   }
 
   /* Authenticate ourselves */
   if (authenticate_with_password(*session) < 0) {
     ssh_disconnect(*session);
     ssh_free(*session);
-    return(SSH_ERROR);
+    return (SSH_ERROR);
   }
 }
