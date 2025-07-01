@@ -1,8 +1,5 @@
 #include "argument_parser.h"
 
-/* Our argp parser. */
-static struct argp argp = { options, parse_opt, 0, doc };
-
 int main (int argc, char **argv) {
   struct arguments arguments;
 

@@ -5,6 +5,9 @@
 #include <argp.h>
 #include <string.h>
 
+/* Parse a single option. */
+error_t parse_opt (int key, char *arg, struct argp_state *state);
+
 extern const char *argp_program_bug_address;
 
 /* Program documentation. */
@@ -21,14 +24,14 @@ static struct argp_option options[] = {
   { 0 }
 };
 
+/* Our argp parser. */
+static struct argp argp = { options, parse_opt, 0, doc };
+
 /* Used by main to communicate with parse_opt. */
 struct arguments {
   int verbose, threshold;
   char *private_key_file, *address, *orientation;
 };
-
-/* Parse a single option. */
-error_t parse_opt (int key, char *arg, struct argp_state *state);
 
 /* Print the argument list */
 void print_arguments(struct arguments *args);
