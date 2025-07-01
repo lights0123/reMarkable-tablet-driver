@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include "argument_parser.h"
 
 /*
  * https://api.libssh.org/stable/libssh_tutor_guided_tour.html
@@ -120,33 +121,105 @@ int authenticate_privkey(ssh_session session, ssh_key privkey) {
   return rc;
 }
 
-int main(int argc, char *argv[])
-{
-  char ssh_host[16] = "10.11.99.1";
-  int ssh_port = 22;
-  FILE *private_key_file = NULL;
-
-  if (argc > 1) {
-    /* 192.168.xxx.xxx = 15 characters */
-    if (strlen(argv[1]) > 15) {
-      printf("Address is too long!\n");
-      return(EXIT_FAILURE);
-    } else {
-      printf("Address is %s\n", argv[1]);
-
-      strcpy(ssh_host, argv[1]);
-    }
+/* 
+ * Authenticate using the password.
+ */
+int authenticate_with_password(ssh_session session) {
+  const char buf_size = 16;
+  char password[buf_size] = {};
+  int rc = ssh_getpass("Input ssh password: ", password, buf_size, 0, 0);
+  if (rc == -1) {
+    fprintf(stderr, "Failed to read password!\n");
+    return rc;
   }
 
-  /* reMarkable SSH Session */
+  rc = ssh_userauth_password(session, "root", password);
+  if (rc != SSH_AUTH_SUCCESS) {
+    fprintf(stderr, "Error authenticating with password: %s\n", ssh_get_error(session));
+  }
+  return rc;
+}
+
+int print_command_output(ssh_session session, const char* cmd) {
+  ssh_channel channel;
+  const int buffer_size = 256;
+  char buffer[buffer_size];
+  int nbytes;
+
+  channel = ssh_channel_new(session);
+  if (channel == NULL) {
+    fprintf(stderr, "Failed to create channel: %s\n", ssh_get_error(session));
+    return SSH_ERROR;
+  }
+
+  int rc = ssh_channel_open_session(channel);
+  if (rc != SSH_OK) {
+    ssh_channel_free(channel);
+    return rc;
+  }
+
+  rc = ssh_channel_request_exec(channel, cmd);
+  if (rc != SSH_OK) {
+    ssh_channel_close(channel);
+    ssh_channel_free(channel);
+    return rc;
+  }
+
+  nbytes = ssh_channel_read(channel, buffer, buffer_size, 0);
+  while (nbytes > 0) {
+    if (write(1, buffer, nbytes) != (unsigned int) nbytes) {
+      ssh_channel_close(channel);
+      ssh_channel_free(channel);
+    }
+    nbytes = ssh_channel_read(channel, buffer, buffer_size, 0);
+  }
+
+  if (nbytes < 0) {
+    ssh_channel_close(channel);
+    ssh_channel_free(channel);
+    return SSH_ERROR;
+  }
+
+  /* Cleanup */
+  ssh_channel_send_eof(channel);
+  ssh_channel_close(channel);
+  ssh_channel_free(channel);
+}
+
+int main(int argc, char *argv[])
+{
+  /*
+   * Argument parsing bit
+   */
+  struct arguments arguments;
+
+  /* Default values. */
+  arguments.verbose = 0;
+  arguments.private_key_file = "";
+  arguments.address = "10.11.99.1";
+  arguments.orientation = "right";
+  arguments.threshold = 600;
+
+  /* Parse our arguments; every option seen by parse_opt will
+     be reflected in arguments. */
+  argp_parse (&argp, argc, argv, 0, 0, &arguments);
+
+  if (arguments.verbose) {
+    print_arguments(&arguments);
+  }
+
+  /*
+   * SSH Connection bit
+   */
   ssh_session session = ssh_new();
-  if (session == NULL)
-    printf("Couldn't create SSH session.\n");
+  if (session == NULL) {
+    fprintf(stderr, "Couldn't create SSH session.\n");
     return(SSH_ERROR);
+  }
 
   /* SSH Connection Config */
-  ssh_options_set(session, SSH_OPTIONS_HOST, ssh_host);
-  ssh_options_set(session, SSH_OPTIONS_PORT, &ssh_port); /* TODO: Add CLI argument for this */
+  ssh_options_set(session, SSH_OPTIONS_HOST, arguments.address);
+  ssh_options_set(session, SSH_OPTIONS_PORT, &arguments.port); /* TODO: Add CLI argument for this */
 
   /* Try to establish connection */
   if (ssh_connect(session) != SSH_OK) {
@@ -163,11 +236,14 @@ int main(int argc, char *argv[])
   }
 
   /* Authenticate ourselves */
-  if (authenticate_privkey(session, private_key) < 0) {
+  if (authenticate_with_password(session) < 0) {
     ssh_disconnect(session);
     ssh_free(session);
-    return (SSH_ERROR);
+    return(SSH_ERROR);
   }
+
+  /* Run ls command on tablet */
+  print_command_output(session, "ls");
 
   /* Cleanup */
   ssh_disconnect(session);
