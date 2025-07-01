@@ -1,6 +1,7 @@
 // Custom device:
 #include <fcntl.h>
 #include <linux/uinput.h>
+
 #include <stdbool.h>
 
 #include "argument_parser.h"
@@ -14,11 +15,14 @@ static ssh_channel input_channel = NULL;
 
 /* This function only prints if verbose is enabled */
 static inline void print_verbose(const char *format, ...) {
-  if (verbose) printf(format);
+    if (verbose) {
+        printf(format);
+    }
 }
 
-void emit(int fd, int type, int code, int val) {
-  struct input_event ie;
+void emit(int fd, int type, int code, int val)
+{
+   struct input_event ie;
 
   ie.type = type;
   ie.code = code;
@@ -71,70 +75,90 @@ void get_pen_device_path(char *pen_device_path, size_t path_len) {
 
 // Helper: Open a persistent SSH channel and start cat on the device
 void open_input_channel(const char *pen_device_path) {
-  input_channel = ssh_channel_new(session);
-  if (input_channel == NULL) {
-    fprintf(stderr, "Failed to create SSH channel\n");
-    exit(1);
-  }
-  int rc = ssh_channel_open_session(input_channel);
-  if (rc != SSH_OK) {
-    fprintf(stderr, "Failed to open SSH channel session\n");
-    ssh_channel_free(input_channel);
-    exit(1);
-  }
-  char cmd[256];
-  print_verbose("Opening persistent input channel: %s\n", cmd);
-  rc = ssh_channel_request_exec(input_channel, cmd);
-  if (rc != SSH_OK) {
-    fprintf(stderr, "Failed to exec remote cat command\n");
-    ssh_channel_close(input_channel);
-    ssh_channel_free(input_channel);
-    exit(1);
-  }
+    input_channel = ssh_channel_new(session);
+    if (input_channel == NULL) {
+        fprintf(stderr, "Failed to create SSH channel\n");
+        exit(1);
+    }
+    int rc = ssh_channel_open_session(input_channel);
+    if (rc != SSH_OK) {
+        fprintf(stderr, "Failed to open SSH channel session\n");
+        ssh_channel_free(input_channel);
+        exit(1);
+    }
+    char cmd[256];
+    snprintf(cmd, sizeof(cmd), "cat %s", pen_device_path);
+    print_verbose("Opening persistent input channel: %s\n", cmd);
+    rc = ssh_channel_request_exec(input_channel, cmd);
+    if (rc != SSH_OK) {
+        fprintf(stderr, "Failed to exec remote cat command\n");
+        ssh_channel_close(input_channel);
+        ssh_channel_free(input_channel);
+        exit(1);
+    }
 }
 
 // Helper: Read a single input_event from the persistent SSH channel
 void read_remote_input_event(struct input_event *ie) {
-  size_t total = 0;
-  char *ptr = (char *)ie;
-  while (total < sizeof(struct input_event)) {
-    int n = ssh_channel_read(input_channel, ptr + total,
-                             sizeof(struct input_event) - total, 0);
-    if (n < 0) {
-      fprintf(stderr, "Failed to read input_event from SSH channel (error)\n");
-      ssh_channel_close(input_channel);
-      ssh_channel_free(input_channel);
-      exit(1);
+    /* 
+     * Given format:
+     * Time, millis, type, code, value
+     * unsigned int, unsigned int, unsigned short, unsigned short, int
+     * 4, 4, 2, 2, 4
+     * Total is 16 bytes
+     */
+    size_t total = 0;
+    const size_t input_size = 16;
+    char buffer[input_size] = {};
+    char *ptr = buffer;
+
+    while (total < input_size) {
+        int n = ssh_channel_read(input_channel, ptr + total, input_size - total, 0);
+        if (n < 0) {
+            fprintf(stderr, "Failed to read input_event from SSH channel (error)\n");
+            ssh_channel_close(input_channel);
+            ssh_channel_free(input_channel);
+            exit(1);
+        }
+        if (n == 0) {
+            fprintf(stderr, "EOF before reading full input_event (%zu/%zu bytes)\n", total, input_size);
+            ssh_channel_close(input_channel);
+            ssh_channel_free(input_channel);
+            exit(1);
+        }
+        total += n;
     }
-    if (n == 0) {
-      if (total < sizeof(struct input_event)) {
-        fprintf(stderr, "EOF before reading full input_event (%zu/%zu bytes)\n",
-                total, sizeof(struct input_event));
-        ssh_channel_close(input_channel);
-        ssh_channel_free(input_channel);
-        exit(1);
-      }
-      break;
-    }
-    total += n;
-  }
+
+    // Unpack the struct from the buffer
+    size_t offset = 0;
+    // Skip time
+    //memcpy(&ie->time.tv_sec, buffer + offset, 4);
+    offset += 4;
+    //memcpy(&ie->time.tv_usec, buffer + offset, 4);
+    offset += 4;
+    memcpy(&ie->type, buffer + offset, 2);
+    offset += 2;
+    memcpy(&ie->code, buffer + offset, 2);
+    offset += 2;
+    memcpy(&ie->value, buffer + offset, 4);
 }
 
 /* Gets the input event from the tablet using SSH */
 struct input_event get_input_event() {
-  static char pen_device_path[128] = "";
-  static int channel_opened = 0;
-  struct input_event ie;
-  // Only detect the pen device path and open channel once
-  if (pen_device_path[0] == '\0') {
-    get_pen_device_path(pen_device_path, sizeof(pen_device_path));
-  }
-  if (!channel_opened) {
-    open_input_channel(pen_device_path);
-    channel_opened = 1;
-  }
-  read_remote_input_event(&ie);
-  return ie;
+    static char pen_device_path[128] = "";
+    static int channel_opened = 0;
+    struct input_event ie;
+    // Only detect the pen device path and open channel once
+    if (pen_device_path[0] == '\0') {
+        get_pen_device_path(pen_device_path, sizeof(pen_device_path));
+    }
+    if (!channel_opened) {
+        open_input_channel(pen_device_path);
+        channel_opened = 1;
+    }
+    read_remote_input_event(&ie);
+    print_verbose("Input Event. Type: %d, Code: %d, Value: %d\n", ie.type, ie.code, ie.value);
+    return ie;
 }
 
 void addAbsCapability(int fd, int code, int32_t value, int32_t min, int32_t max,
