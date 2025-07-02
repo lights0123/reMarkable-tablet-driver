@@ -215,6 +215,7 @@ int main(int argc, char **argv) {
   fd = open("/dev/uinput", O_WRONLY | O_NONBLOCK);
 
   ioctl(fd, UI_SET_EVBIT, EV_KEY);
+  ioctl(fd, UI_SET_KEYBIT, BTN_TOOL_RUBBER);
   ioctl(fd, UI_SET_KEYBIT, BTN_TOOL_PEN);  // BTN_TOOL_PEN == 1 means that the
                                            // pen is hovering over the tablet
   ioctl(fd, UI_SET_KEYBIT,
