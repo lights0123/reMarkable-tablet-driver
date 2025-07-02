@@ -26,24 +26,6 @@ error_t parse_opt(int key, char *arg, struct argp_state *state) {
     case 'a':
       arguments->address = arg;
       break;
-    case 'p':
-      arguments->port = atoi(arg);
-      break;
-    case 'o':
-      if (strcmp(arg, "top") == 0 || strcmp(arg, "bottom") == 0 ||
-          strcmp(arg, "right") == 0 || strcmp(arg, "left") == 0) {
-        arguments->orientation = arg;
-      } else {
-        fprintf(stderr,
-                "Wrong argument key %s. Is it one of top, left, right, "
-                "bottom?\n",
-                arg);
-        return ARGP_ERR_UNKNOWN;
-      }
-      break;
-    case 't':
-      arguments->threshold = atoi(arg);
-      break;
 
     default:
       return ARGP_ERR_UNKNOWN;
@@ -55,10 +37,6 @@ void print_arguments(struct arguments *args) {
   printf(
       "verbose = %s\n"
       "private key file = %s\n"
-      "address = %s\n"
-      "port = %d\n"
-      "orientation = %s\n"
-      "threshold = %d\n\n",
-      args->verbose ? "yes" : "no", args->private_key_file, args->address,
-      args->port, args->orientation, args->threshold);
+      "address = %s\n",
+      args->verbose ? "yes" : "no", args->private_key_file, args->address);
 }

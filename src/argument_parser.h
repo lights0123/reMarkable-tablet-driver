@@ -21,13 +21,6 @@ static struct argp_option options[] = {
     {"key", 'k', "FILE", 0, "Private key used for authentication."},
     {"address", 'a', "ADDRESS", 0,
      "Address of reMarkable tablet. Default is 10.11.99.1."},
-    {"port", 'p', "PORT", 0, "Port for ssh connection. Default is 22."},
-    {"orientation", 'o', "ORIENTATION", 0,
-     "Tablet orientation. Valid options are top, left, right, bottom, "
-     "corresponding to the position of the tablet buttons. Case sensitive! "
-     "Default is right."},
-    {"threshold", 't', "THRESHOLD", 0,
-     "Pen pressure threshold. Default is 600."},
     {0}};
 
 /* Our argp parser. */
