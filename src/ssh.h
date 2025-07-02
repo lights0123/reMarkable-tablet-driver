@@ -33,6 +33,6 @@ int authenticate_with_password(ssh_session session);
 int print_command_output(ssh_session session, const char *cmd);
 
 int create_ssh_session(ssh_session *session, const char *address,
-                       const int *port);
+                       const int port);
 
 #endif

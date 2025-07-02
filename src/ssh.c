@@ -169,7 +169,7 @@ int print_command_output(ssh_session session, const char *cmd) {
 }
 
 int create_ssh_session(ssh_session *session, const char *address,
-                       const int *port) {
+                       const int port) {
   *session = ssh_new();
   if (*session == NULL) {
     fprintf(stderr, "Couldn't create SSH session.\n");
@@ -178,7 +178,7 @@ int create_ssh_session(ssh_session *session, const char *address,
 
   /* SSH Connection Config */
   ssh_options_set(*session, SSH_OPTIONS_HOST, address);
-  ssh_options_set(*session, SSH_OPTIONS_PORT, port);
+  ssh_options_set(*session, SSH_OPTIONS_PORT, &port);
 
   /* Try to establish connection */
   if (ssh_connect(*session) != SSH_OK) {

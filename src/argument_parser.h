@@ -28,8 +28,8 @@ static struct argp argp = {options, parse_opt, 0, doc};
 
 /* Used by main to communicate with parse_opt. */
 struct arguments {
-  int verbose, threshold, port;
-  char *private_key_file, *address, *orientation;
+  int verbose;
+  char *private_key_file, *address;
 };
 
 /* Print the argument list */

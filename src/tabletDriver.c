@@ -197,9 +197,6 @@ int main(int argc, char **argv) {
   arguments.verbose = 0;
   arguments.private_key_file = "";
   arguments.address = "10.11.99.1";
-  arguments.port = 22;
-  arguments.orientation = "right";
-  arguments.threshold = 600;
 
   /* Parse our arguments; every option seen by parse_opt will
      be reflected in arguments. */
@@ -250,7 +247,7 @@ int main(int argc, char **argv) {
   }
 
   /* Connect to reMarkable */
-  create_ssh_session(&session, arguments.address, &arguments.port);
+  create_ssh_session(&session, arguments.address, 22);
   printf("Connected\n");
 
   while (1) {
