@@ -12,7 +12,7 @@ error_t parse_opt(int key, char *arg, struct argp_state *state) {
     case 'v':
       arguments->verbose = 1;
       break;
-    case 'k':
+    case 'a':
       /* 192.168.xxx.xxx = 15 characters */
       if (strlen(arg) > 15) {
         fprintf(
@@ -21,10 +21,10 @@ error_t parse_opt(int key, char *arg, struct argp_state *state) {
             arg);
         return ARGP_ERR_UNKNOWN;
       }
-      arguments->private_key_file = arg;
-      break;
-    case 'a':
       arguments->address = arg;
+      break;
+    case 'k':
+      arguments->private_key_file = arg;
       break;
 
     default:

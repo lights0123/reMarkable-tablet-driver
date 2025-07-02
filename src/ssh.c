@@ -87,17 +87,8 @@ int verify_knownhost(ssh_session session) {
   return 0;
 }
 
-int authenticate_pubkey(ssh_session session) {
-  int rc = ssh_userauth_publickey_auto(session, NULL, NULL);
-  if (rc == SSH_AUTH_ERROR) {
-    fprintf(stderr, "Authentication failed: %s\n", ssh_get_error(session));
-    return SSH_AUTH_ERROR;
-  }
-  return rc;
-}
-
 int authenticate_privkey(ssh_session session, ssh_key privkey) {
-  int rc = ssh_userauth_publickey(session, NULL, privkey);
+  int rc = ssh_userauth_publickey(session, "root", privkey);
   if (rc == SSH_AUTH_ERROR) {
     fprintf(stderr, "Authentication failed: %s\n", ssh_get_error(session));
     return SSH_AUTH_ERROR;
@@ -169,7 +160,7 @@ int print_command_output(ssh_session session, const char *cmd) {
 }
 
 int create_ssh_session(ssh_session *session, const char *address,
-                       const int port) {
+                       const int port, const char *privkey) {
   *session = ssh_new();
   if (*session == NULL) {
     fprintf(stderr, "Couldn't create SSH session.\n");
@@ -195,9 +186,50 @@ int create_ssh_session(ssh_session *session, const char *address,
   }
 
   /* Authenticate ourselves */
-  if (authenticate_with_password(*session) < 0) {
-    ssh_disconnect(*session);
-    ssh_free(*session);
-    return (SSH_ERROR);
+  if (strlen(privkey) != 0) {
+    ssh_key key = NULL;
+    const char buf_size = 64;
+    char password[buf_size] = {};
+    int rc = ssh_getpass("Input private key password or leave blank if you didn't set one: ", password, buf_size, 0, 0);
+    if (rc == -1) {
+      fprintf(stderr, "Failed to read password!\n");
+      return rc;
+    }
+    rc = ssh_pki_import_privkey_file(privkey, strlen(password) != 0 ? password : NULL, NULL, NULL, &key);
+    switch (rc) {
+      case SSH_EOF:
+        fprintf(stderr, "Error reading private key! Either the file doesn't exist or permission denied.\n");
+        ssh_disconnect(*session);
+        ssh_free(*session);
+        return (SSH_ERROR);
+        break;
+      case SSH_ERROR:
+        fprintf(stderr, "Error reading the private key.\n");
+        ssh_disconnect(*session);
+        ssh_free(*session);
+        return (SSH_ERROR);
+        break;
+      default:
+        break;
+    }
+
+    rc = authenticate_privkey(*session, key);
+    if (key)
+      ssh_key_free(key);
+    if (rc != SSH_AUTH_SUCCESS) {
+      fprintf(stderr, "SSH publickey authentication failed.\n");
+      ssh_disconnect(*session);
+      ssh_free(*session);
+      return (SSH_ERROR);
+    }
+  } else {
+    int rc = authenticate_with_password(*session);
+    if (rc != SSH_AUTH_SUCCESS) {
+      fprintf(stderr, "SSH password authentication failed.\n");
+      ssh_disconnect(*session);
+      ssh_free(*session);
+      return (SSH_ERROR);
+    }
   }
+  return 0;
 }

@@ -39,9 +39,10 @@ void pass_input_event(struct input_event ie) { write(fd, &ie, sizeof(ie)); }
 
 // Helper: Get the pen device path from the remote tablet
 void get_pen_device_path(char *pen_device_path, size_t path_len) {
+  print_verbose("Trying to open an SSH Channel to get pen device path...\n");
   ssh_channel channel = ssh_channel_new(session);
   if (channel == NULL) {
-    fprintf(stderr, "Failed to create SSH channel\n");
+    fprintf(stderr, "Failed to create SSH channel: %s\n", ssh_get_error(session));
     exit(1);
   }
   int rc = ssh_channel_open_session(channel);
@@ -71,10 +72,12 @@ void get_pen_device_path(char *pen_device_path, size_t path_len) {
   ssh_channel_send_eof(channel);
   ssh_channel_close(channel);
   ssh_channel_free(channel);
+  print_verbose("Pen device path is: %s\n", pen_device_path);
 }
 
 // Helper: Open a persistent SSH channel and start cat on the device
 void open_input_channel(const char *pen_device_path) {
+    print_verbose("Trying to open a persistent channel for input...\n");
     input_channel = ssh_channel_new(session);
     if (input_channel == NULL) {
         fprintf(stderr, "Failed to create SSH channel\n");
@@ -96,6 +99,7 @@ void open_input_channel(const char *pen_device_path) {
         ssh_channel_free(input_channel);
         exit(1);
     }
+    print_verbose("Persistent channel opened successfully!\n");
 }
 
 // Helper: Read a single input_event from the persistent SSH channel
@@ -247,7 +251,9 @@ int main(int argc, char **argv) {
   }
 
   /* Connect to reMarkable */
-  create_ssh_session(&session, arguments.address, 22);
+  if (create_ssh_session(&session, arguments.address, 22, arguments.private_key_file) < 0) {
+    return SSH_ERROR;
+  }
   printf("Connected\n");
 
   while (1) {
