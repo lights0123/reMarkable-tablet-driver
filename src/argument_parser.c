@@ -30,7 +30,7 @@ error_t parse_opt(int key, char *arg, struct argp_state *state) {
       arguments->port = atoi(arg);
       break;
     case 'o':
-      if (strcmp(arg, "top") == 0 || strcmp(arg, "buttom") == 0 ||
+      if (strcmp(arg, "top") == 0 || strcmp(arg, "bottom") == 0 ||
           strcmp(arg, "right") == 0 || strcmp(arg, "left") == 0) {
         arguments->orientation = arg;
       } else {
