@@ -10,12 +10,12 @@ pkg_check_modules(LIBSSH REQUIRED libssh)
 include_directories(${LIBSSH_INCLUDE_DIRS})
 link_directories(${LIBSSH_LIBRARY_DIRS})
 
-add_executable(tabletDriver
+add_executable(rmTabletDriver
     src/tabletDriver.c
     src/argument_parser.c
     src/ssh.c
 )
 
-target_link_libraries(tabletDriver ${LIBSSH_LIBRARIES})
+target_link_libraries(rmTabletDriver ${LIBSSH_LIBRARIES})
 
-install(TARGETS tabletDriver DESTINATION bin)
+install(TARGETS rmTabletDriver DESTINATION bin)
