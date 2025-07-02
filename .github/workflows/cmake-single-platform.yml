@@ -4,7 +4,7 @@ name: CMake on a single platform
 
 on:
   push:
-    branches: [ "main", "GH-Actions" ]
+    branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
 
