@@ -36,19 +36,13 @@ Then run `make install` as usual.
 
 # Command Line Arguments
 ```
-Usage: tabletDriver [OPTION...]
+Usage: rmTabletDriver [OPTION...]
 reMarkable Tablet Driver -- a driver for using your reMarkable tablet as pen
 input
 
   -a, --address=ADDRESS      Address of reMarkable tablet. Default is
                              10.11.99.1.
   -k, --key=FILE             Private key used for authentication.
-  -o, --orientation=ORIENTATION   Tablet orientation. Valid options are top,
-                             left, right, bottom, corresponding to the position
-                             of the tablet buttons. Case sensitive! Default is
-                             right.
-  -p, --port=PORT            Port for ssh connection. Default is 22.
-  -t, --threshold=THRESHOLD  Pen pressure threshold. Default is 600.
   -v, --verbose              Produce verbose output.
   -?, --help                 Give this help list
       --usage                Give a short usage message
