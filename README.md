@@ -1,6 +1,9 @@
 # reMarkable Tablet Driver
 This userspace driver for Linux is able to simulate the real tablet input from your reMarkable Paper Tablet on your PC, with pressure sensitivity.
 
+# Demo
+![Video demo of the reMarkable Tablet Driver](demo.webm)
+
 # Building
 You can build the project using CMake:
 
