@@ -2,9 +2,34 @@
 This userspace driver for Linux is able to simulate the real tablet input from your reMarkable Paper Tablet on your PC.
 
 # Building
-Simply run `make` in the same directory as this README.md
+You can build the project using CMake:
 
-You will need `libssh` to build this!
+```sh
+mkdir build
+cd build
+cmake ..
+make
+```
+
+This will generate the `tabletDriver` binary in the `build` directory. Ensure you have `libssh` and its development headers installed, as well as `pkg-config`.
+
+# Installation
+
+To install the built binary, run:
+
+```
+sudo make install
+```
+
+This will copy the `tabletDriver` binary to `/usr/local/bin`.
+
+If you want to change the install location, you can specify it when running cmake:
+
+```
+cmake -DCMAKE_INSTALL_PREFIX=$HOME/.local/bin ..
+```
+
+Then run `make install` as usual.
 
 # Command Line Arguments
 ```

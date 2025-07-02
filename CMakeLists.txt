@@ -17,3 +17,5 @@ add_executable(tabletDriver
 )
 
 target_link_libraries(tabletDriver ${LIBSSH_LIBRARIES})
+
+install(TARGETS tabletDriver DESTINATION bin)
